@@ -19,7 +19,7 @@ ENV XMX=1G
 
 ENV TZ=Brazil/East
 
-RUN apk add tzdata ca-certificates jq curl
+RUN apk add --no-cache ca-certificates tzdata jq curl bash
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
@@ -29,4 +29,4 @@ WORKDIR /mineserver
 EXPOSE 25565/tcp
 EXPOSE 25565/udp
 
-ENTRYPOINT [ "/entrypoint.sh" ]
+ENTRYPOINT [ "/bin/bash", "-c", "/entrypoint.sh" ]
