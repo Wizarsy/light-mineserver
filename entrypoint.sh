@@ -1,29 +1,27 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
-install_java() {
+install_java_apk() {
   __PACKAGES_DIR="${PWD}"/.packages
-  __JAVA="$(apk search "openjdk$1-jre*" | grep -Eo '.*(base|headless)')"
-  if [ "$(cat "$__PACKAGES_DIR/java.version" 2> /dev/null)" != "$__JAVA" ]; then
+  if [ -z "$(find . -path "*/.packages")" ]; then
+    mkdir -p "$__PACKAGES_DIR"
+  fi
+  __JAVA="$(apk search --no-cache "openjdk$1-jre*" | grep -Eo '.*(base|headless)')"
+  __LATEST_JAVA="$(apk list --no-cache "$__JAVA" | awk '/openjdk/ {print $1}')"
+  if [ ! -e "$__PACKAGES_DIR/java.version" ] || [ "$(cat "$__PACKAGES_DIR/java.version")" != "$__LATEST_JAVA" ]; then
     rm -f "$__PACKAGES_DIR"/*.apk
+    echo "$__LATEST_JAVA" > "$__PACKAGES_DIR/java.version"
   fi
-  if [ -n "$__JAVA" ]; then
-    mkdir -p "$__PACKAGES_DIR" 2> /dev/null
-    __DEPENDENCIES=$(apk info -R "$__JAVA")
-    for i in ${__DEPENDENCIES#*:}; do
-      (cd "$__PACKAGES_DIR" && apk fetch "${i%=*}")
-    done
-    (cd "$__PACKAGES_DIR" && apk fetch "$__JAVA")
-    for i in "$__PACKAGES_DIR"/*.apk; do
-      apk add --allow-untrusted "$i"
-    done
+  apk fetch -R --no-cache "$__JAVA" -o "$__PACKAGES_DIR"
+  if [ -n "$(find . -wholename "*/.packages/*.apk")" ]; then
+    apk add --no-network --allow-untrusted --repositories-file=/dev/null --no-cache "$__PACKAGES_DIR"/*.apk
   fi
-  echo "$__JAVA" > "$__PACKAGES_DIR/java.version"
 }
 
 dowload_server() {
   if [ ! -e "server.jar" ] && [ ! -e "forge*.jar" ]; then
-    __URI=$(echo "$1" | sed -e "s/{ID}/$2/g" | tr -d '"')
-    curl -L# "$__URI" -o "server.jar"
+    mojang="https://piston-data.mojang.com/v1/objects/${2}/server.jar"
+    forge="https://maven.minecraftforge.net/net/minecraftforge/forge/${2}/forge-${2}-installer.jar"
+    curl -L# "${!1}" -o "server.jar"
   fi
 }
 
@@ -46,7 +44,7 @@ config_server() {
   fi
 }
 
-run_server () {
+run_server() {
   if [ -e "run.sh" ]; then
     "${PWD}"/run.sh nogui &
   else
@@ -55,9 +53,11 @@ run_server () {
   fi
 }
 
-backup(){
+backup() {
   __BACKUP_DIR="${PWD}"/backups
-  mkdir -p "$__BACKUP_DIR" 2> /dev/null
+  if [ -z "$(find . -path "*/backups")" ]; then
+    mkdir -p "$__BACKUP_DIR"
+  fi
   while true; do
     sleep "$AUTOSAVE"
     tar --exclude="backups" --exclude=".packages" -czf "$__BACKUP_DIR/mineserver-$(date "+%F-%H_%M_%S").tar.gz" .
@@ -66,17 +66,18 @@ backup(){
 
 main() {
   __CANDIDATES=$(cat "/etc/mineserver/$LOCAL_CANDIDATES" 2> /dev/null || curl -L# "$ONLINE_CANDIDATES")
-  __VERSION=$(echo "$MINE_VERSION" | cut -d "-" -f1)
-  __VENDOR=$(echo "$MINE_VERSION" | cut -d "-" -f2)
-  __URL=$(echo "$__CANDIDATES" | jq ".url.${__VENDOR}")
-  __JAVA_VERSION=$(echo "$__CANDIDATES" | jq ".${__VERSION}.java")
-  __ID=$(echo "$__CANDIDATES" | jq ".${__VERSION}.${__VENDOR}")
+  OLDIFS="$IFS"
+  IFS="-"; read -ra __VERSION <<< "$MINE_VERSION"
+  IFS="$OLDIFS"
+  unset OLDIFS
+  __JAVA_VERSION=$(jq -r ".${__VERSION[0]}.java" <<< "$__CANDIDATES")
+  __ID=$(jq -r ".${__VERSION[0]}.${__VERSION[1]}" <<< "$__CANDIDATES")
 
-  install_java "$__JAVA_VERSION"
+  install_java_apk "$__JAVA_VERSION"
 
-  dowload_server "$__URL" "$__ID"
+  dowload_server "${__VERSION[1]}" "$__ID" 
 
-  config_server "$__VENDOR"
+  config_server "${__VERSION[1]}"
 
   run_server
 
