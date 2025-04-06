@@ -1,22 +1,10 @@
 FROM alpine:latest
 
-ENV MINE_VERSION=latest-mojang
-ENV ONLINE_CANDIDATES="https://raw.githubusercontent.com/Wizarsy/mine_servers/main/servers.json"
-ENV LOCAL_CANDIDATES=
-ENV AUTOSAVE=900
-
-ENV ONLINE=true
-ENV GAMEMODE=survival
-ENV DIFFICULTY=normal
-ENV SEED=
-ENV MAX_PLAYERS=10
-ENV PVP=true
-ENV MOTD="A Minecraft Server"
-ENV VIEW_DISTANCE=10
-ENV SIMULATION_DISTANCE=10
-
-ENV XMX=1G
-
+ENV SERVER_VERSION=latest-mojang
+ENV CANDIDATES_FILE="https://raw.githubusercontent.com/Wizarsy/mine_servers/main/servers.json"
+ENV AUTOBACKUP=900
+ENV JVM_ARGS="-Xms2G -Xmx2G"
+ENV SERVER_ARGS="nogui"
 ENV TZ=Brazil/East
 
 RUN apk add --no-cache ca-certificates tzdata jq curl bash
